@@ -73,6 +73,17 @@ sub DetermineMpdMusicDirectory {
     return $music_dir;
 }
 
+sub DeterminePlaylistLength {
+    my $total_seconds = 0;
+    my @lengths = split("\n", `mpc playlist -f '\%time\%' $_[0]`);
+    foreach my $length (@lengths) {
+        my @split = split(":", $length);
+        $total_seconds += $split[1];
+        $total_seconds += $split[0]*60;
+    }
+    return $total_seconds;
+}
+
 my $mpd_music_directory = DetermineMpdMusicDirectory();
 print("Enter music directory (leave blank for $mpd_music_directory):");
 my $mpd_dir_input = <>;
@@ -92,6 +103,15 @@ chomp($selection);
 if ($selection < 0 || $selection >= (scalar @playlists)) {
     die("Invalid index");
 }
+
+my $playlist_length_seconds = DeterminePlaylistLength($playlists[$selection]);
+if ($playlist_length_seconds > 80*60) { #80 minutes
+    my $warn_selection = YesNo("This playlist exceeds 80 minutes. Are you sure you want to continue?");
+    if (!$warn_selection) {
+        exit;
+    }
+}
+
 my @songs = split("\n", `mpc playlist -f '\%file\%' $playlists[$selection]`);
 
 my $tmp_dir =  tempdir(CLEANUP => 1);

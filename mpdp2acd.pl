@@ -64,7 +64,7 @@ if ($selection < 0 || $selection >= (scalar @playlists)) {
 }
 my @songs = split("\n", `mpc playlist -f '\%file\%' $playlists[$selection]`);
 
-my $tmp_dir =  tempdir(CLEANUP => 0);
+my $tmp_dir =  tempdir(CLEANUP => 1);
 my @cdtext_info = ();
 for (my $i = 0; $i < scalar @songs; $i++) {
     my $song = $songs[$i];
@@ -109,4 +109,20 @@ if ($use_wavegain) {
         die("wavegain returned non-zero exit code $exit_code");
     }
     print("wavegain processing completed\n");
+}
+
+my $burn_cmd = "cdrdao write --device /dev/sr0 -v 2 --eject toc.txt";
+my $burn_immediately = YesNo("Do you want to immediately burn this data to disc? (If no, a tar archive will be generated in your home directory)");
+if ($burn_immediately) {
+    my $exit_code = system($burn_cmd);
+    if ($exit_code != 0) {
+        die("Failed to burn CD: cdrdao returned non-zero exit code $exit_code");
+    }
+} else {
+    open(FH, '>', "$tmp_dir/burn.sh");
+    print FH $burn_cmd;
+    close(FH);
+    my $tar_filename = "mpdp2acd-$playlists[$selection].tar.gz";
+    my $exit_code = system("cd $tmp_dir && tar -czf ~/$tar_filename *");
+    print("A file named $tar_filename has been placed in your home directory, run burn.sh to begin the burning process.");
 }

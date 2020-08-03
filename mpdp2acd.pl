@@ -64,7 +64,7 @@ if ($selection < 0 || $selection >= (scalar @playlists)) {
 }
 my @songs = split("\n", `mpc playlist -f '\%file\%' $playlists[$selection]`);
 
-my $tmp_dir =  tempdir(CLEANUP => 1);
+my $tmp_dir =  tempdir(CLEANUP => 0);
 my $use_cdtext = YesNo("Would you like to include CD text information?");
 my @cdtext_info = ();
 for (my $i = 0; $i < scalar @songs; $i++) {
@@ -73,7 +73,7 @@ for (my $i = 0; $i < scalar @songs; $i++) {
     if ($use_cdtext) {
         $cdtext_info[$i] = GenTrackTextBlock($song, $song_index);
     }
-    my $exit = system("ffmpeg -loglevel quiet -i \"$song\" -map_metadata 0 \"$tmp_dir/$song_index.wav\"");
+    my $exit = system("ffmpeg -loglevel quiet -i \"$song\" -map_metadata 0 -ar 44100 \"$tmp_dir/$song_index.wav\"");
 }
 my $final_cdtext = undef;
 if ($use_cdtext) {
@@ -104,4 +104,13 @@ $formatted_cdtext_info
 ";
     open(FH, '>', "$tmp_dir/toc.txt");
     print FH $final_cdtext;
+}
+
+my $use_wavegain = YesNo("Would you like to use wavegain to normalize volume levels?");
+if ($use_wavegain) {
+    my $exit_code = system("cd $tmp_dir && wavegain -y $tmp_dir/*.wav 2>/dev/null");
+    if ($exit_code != 0) {
+        die("wavegain returned non-zero exit code $exit_code");
+    }
+    print("wavegain processing completed\n");
 }

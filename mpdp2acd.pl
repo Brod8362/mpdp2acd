@@ -6,7 +6,7 @@ use JSON;
 use File::Temp "tempdir";
 
 sub YesNo {
-    print("$_[0] [Y/n]\n");
+    print("$_[0] [Y/n]");
     my $chosen = <>;
     chomp($chosen);
     $chosen = lc($chosen);
@@ -50,6 +50,36 @@ CD_TEXT {
 FILE \"$_[1].wav\" 0
 "
 }
+my $HOME = $ENV{"HOME"};
+my @mpd_configs = ("$HOME/.mpdconf", "$HOME/.config/mpd/mpd.conf","/etc/mpd.conf");
+sub DetermineMpdMusicDirectory {
+    my $music_dir = undef;
+    foreach my $config_file (@mpd_configs) {
+        if (-e $config_file) {
+            open my $FH, '<', $config_file;
+            while (<$FH>) {
+                my $line = $_ if $_ =~ /music_directory\s.*"/;
+                if (!defined $line) {
+                    next;
+                }
+                my @split_str = split(" ", $line);
+                $music_dir = substr $split_str[1], 1, -1;
+            }
+        }
+    }
+    if (!defined $music_dir) {
+        die("Cannot determine mpd music directory\n");
+    }
+    return $music_dir;
+}
+
+my $mpd_music_directory = DetermineMpdMusicDirectory();
+print("Enter music directory (leave blank for $mpd_music_directory):");
+my $mpd_dir_input = <>;
+chomp($mpd_dir_input);
+if ($mpd_dir_input ne "") {
+    $mpd_music_directory = $mpd_dir_input;
+}
 
 my @playlists = split("\n", `mpc lsplaylists`);
 printf("Available playlists:\n");
@@ -67,10 +97,11 @@ my @songs = split("\n", `mpc playlist -f '\%file\%' $playlists[$selection]`);
 my $tmp_dir =  tempdir(CLEANUP => 1);
 my @cdtext_info = ();
 for (my $i = 0; $i < scalar @songs; $i++) {
-    my $song = $songs[$i];
+    my $song = $mpd_music_directory."/".$songs[$i];
     my $song_index = $i+1;
     $cdtext_info[$i] = GenTrackTextBlock($song, $song_index);
-    my $exit = system("ffmpeg -loglevel quiet -i \"$song\" -map_metadata 0 -ar 44100 \"$tmp_dir/$song_index.wav\"");
+    my $ffmpeg_cmd = "ffmpeg -loglevel quiet -i \"$song\" -map_metadata 0 -ar 44100 \"$tmp_dir/$song_index.wav\"";
+    my $exit = system($ffmpeg_cmd);
 }
 my $final_cdtext = undef;
 my $formatted_cdtext_info = join("\n", @cdtext_info);

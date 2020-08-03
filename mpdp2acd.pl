@@ -162,7 +162,7 @@ if ($use_wavegain) {
     print("wavegain processing completed\n");
 }
 
-my $burn_cmd = "cdrdao write --device /dev/sr0 -v 2 --eject toc.txt";
+my $burn_cmd = "cdrdao write --device /dev/sr0 --driver generic-mmc:0x10 -v 2 --eject toc.txt";
 my $burn_immediately = YesNo("Do you want to immediately burn this data to disc? (If no, a tar archive will be generated in your home directory)");
 if ($burn_immediately) {
     my $exit_code = system($burn_cmd);
@@ -172,6 +172,7 @@ if ($burn_immediately) {
 } else {
     open(FH, '>', "$tmp_dir/burn.sh");
     print FH $burn_cmd;
+    print FH "\n# If this command fails (or if the cd-text data isn't present on the disc), try switching the driver to generic-mmc-raw instead. Using generic-mmc:0x10 worked for me with a TSSTcorp SH-224BB.";
     close(FH);
     my $tar_filename = "mpdp2acd-$playlists[$selection].tar.gz";
     my $exit_code = system("cd $tmp_dir && tar -czf ~/$tar_filename *");

@@ -5,7 +5,7 @@ A perl script to burn an audio CD from an mpd playlist.
 Made primarily for the tiny subset of people who love to use MPD but also for some reason need to still use Audio CDs (for older vehicles, perhaps)
 
 ## Dependencies
-`cdrdao`, `ffmpeg`, `ffprobe`, `mpc`, `mpd`, `perl`, `wavegain` (optional), `tar`, (optional)
+`cdrdao`, `ffmpeg`, `ffprobe`, `mpc`, `mpd`, `perl`, `perl-json`, `wavegain` (optional), `tar`, (optional)
 
 ## Notes
 If the burn fails or the CD-Text data fails to be burned to the CD, try switching the driver in `burn.sh` from `generic-mmc:0x10` to `generic-mmc-raw`. This will just depend on what burner you're using. I have a TSSTcorp SH-224BB which I think may be a Samsung SH-224BB in disguise. Regardless, I had to use `generic-mmc:0x10`. 

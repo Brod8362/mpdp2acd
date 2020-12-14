@@ -16,12 +16,21 @@ sub YesNo {
 sub GenTrackTextBlock { # song URI, index
     my ($filename) = @_;
     $filename =~ s/'/'\\''/g;
-    my $output = `ffprobe -v quiet -print_format json -show_format '$filename'`;
+    my $output = `ffprobe -v quiet -print_format json -show_format "$filename"`;
     my $json = decode_json($output);
     my $title = $json->{"format"}{"tags"}{"title"};
-    my $artist = $json->{"format"}{"tags"}{"artist"} // $json->{"format"}{"tags"}{"album_artist"};
-    if (!defined $title || $title =~ /[^\x00-\x7F]/) {
-        my $add_metadata = YesNo("The track $_[0] does not have title metadata, or it contains characters that may not display properly. Do you want to edit the title?");
+    my $artist = $json->{"format"}{"tags"}{"artist"};
+    if (!defined $artist) {
+        my $temp = $json->{"format"}{"tags"}{"album_artist"};
+        if (defined $temp) {
+            print("[INFO] Using fallback album_artist for $_[0]\n");
+            $artist = $temp;
+        }
+    }
+
+    #Ensure title meta is valid
+    if (!defined $title) {
+        my $add_metadata = YesNo("The track $_[0] does not have title metadata. Do you want to add a title?");
         if ($add_metadata) {
             print("Set title for $_[0]:");
             $title = <>;
@@ -29,8 +38,16 @@ sub GenTrackTextBlock { # song URI, index
             $title = "";
         }
     }
-    if (!defined $artist || $artist =~ /[^\x00-\x7F]/) {
-        my $add_metadata = YesNo("The track $_[0] does not have artist metadata, or it contains characters that may not display properly. Do you want to edit the artist?");
+    if ($title =~ /[^\x00-\x7F]/) {
+        print("[WARN] the track $_[0] contains characters that may not render properly on some CD players.\n")
+    }
+    if (length($title) >=21) {
+        print("[WARN] the track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
+    }
+
+    #Ensure artist meta is valid
+    if (!defined $artist) {
+        my $add_metadata = YesNo("The track $_[0] does not have artist metadata. Do you want to add an artist?");
         if ($add_metadata) {
             print("Set artist for $_[0]:");
             $artist = <>;
@@ -38,6 +55,14 @@ sub GenTrackTextBlock { # song URI, index
             $artist = "";
         }
     }
+    if ($artist =~ /[^\x00-\x7F]/) {
+        print("[WARN] the artist of track $_[0] contains characters that may not render properly on some CD players.\n")
+    }
+    if (length($artist) >=21) {
+        print("[WARN] the artist track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
+    }
+    
+    #Remove whitespace and generate the block
     chomp($title);
     chomp($artist);
     return "TRACK AUDIO
@@ -85,6 +110,7 @@ sub DeterminePlaylistLength {
 }
 
 my $mpd_music_directory = DetermineMpdMusicDirectory();
+$mpd_music_directory =~ s/~/\$HOME/g;
 print("Enter music directory (leave blank for $mpd_music_directory):");
 my $mpd_dir_input = <>;
 chomp($mpd_dir_input);

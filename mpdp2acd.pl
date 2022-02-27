@@ -5,8 +5,20 @@ use warnings;
 use JSON;
 use File::Temp "tempdir";
 
+sub Info {
+    print("[\033[36;1mINFO\033[0m\n] $_[0]");
+}
+
+sub Warn {
+    print("[\033[33;1mWARN\033[0m\n] $_[0]");
+}
+
+sub Error {
+    print("[\033[31;1mWARN\033[0m\n] $_[0]");
+}
+
 sub YesNo {
-    print("$_[0] [Y/n]");
+    print("$_[0] [\033[1mY\033[0m/n]");
     my $chosen = <>;
     chomp($chosen);
     $chosen = lc($chosen);
@@ -23,7 +35,7 @@ sub GenTrackTextBlock { # song URI, index
     if (!defined $artist) {
         my $temp = $json->{"format"}{"tags"}{"album_artist"};
         if (defined $temp) {
-            print("[INFO] Using fallback album_artist for $_[0]\n");
+            info("Using fallback album_artist for $_[0]\n");
             $artist = $temp;
         }
     }
@@ -32,17 +44,17 @@ sub GenTrackTextBlock { # song URI, index
     if (!defined $title) {
         my $add_metadata = YesNo("The track $_[0] does not have title metadata. Do you want to add a title?");
         if ($add_metadata) {
-            print("Set title for $_[0]:");
+            info("Set title for $_[0]:");
             $title = <>;
         } else {
             $title = "";
         }
     }
     if ($title =~ /[^\x00-\x7F]/) {
-        print("[WARN] the track $_[0] contains characters that may not render properly on some CD players.\n")
+        warn("The track \033[1m$_[0]\033[0m contains characters that may not render properly on some CD players.\n")
     }
     if (length($title) >=21) {
-        print("[WARN] the track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
+        warn("The track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
     }
 
     #Ensure artist meta is valid
@@ -56,10 +68,10 @@ sub GenTrackTextBlock { # song URI, index
         }
     }
     if ($artist =~ /[^\x00-\x7F]/) {
-        print("[WARN] the artist of track $_[0] contains characters that may not render properly on some CD players.\n")
+        warn("The artist of track $_[0] contains characters that may not render properly on some CD players.\n")
     }
     if (length($artist) >=21) {
-        print("[WARN] the artist track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
+        warn("The artist track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
     }
     
     #Remove whitespace and generate the block
@@ -126,8 +138,10 @@ for (my $i = 0; $i < @playlists; $i++) {
 printf("Choose a playlist to convert:");
 my $selection = <>;
 chomp($selection);
-if ($selection < 0 || $selection >= (scalar @playlists)) {
-    die("Invalid index");
+while ($selection < 0 || $selection >= (scalar @playlists)) {
+    error("Invalid index");
+    printf("Choose a playlist to convert:")
+    $selection = <>;
 }
 
 my $playlist_length_seconds = DeterminePlaylistLength($playlists[$selection]);

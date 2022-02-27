@@ -6,15 +6,15 @@ use JSON;
 use File::Temp "tempdir";
 
 sub Info {
-    print("[\033[36;1mINFO\033[0m\n] $_[0]");
+    print("[\033[36;1mINFO\033[0m] $_[0]\n");
 }
 
 sub Warn {
-    print("[\033[33;1mWARN\033[0m\n] $_[0]");
+    print("[\033[33;1mWARN\033[0m] $_[0]\n");
 }
 
 sub Error {
-    print("[\033[31;1mWARN\033[0m\n] $_[0]");
+    print("[\033[31;1mWARN\033[0m] $_[0]\n");
 }
 
 sub YesNo {
@@ -35,7 +35,7 @@ sub GenTrackTextBlock { # song URI, index
     if (!defined $artist) {
         my $temp = $json->{"format"}{"tags"}{"album_artist"};
         if (defined $temp) {
-            info("Using fallback album_artist for $_[0]\n");
+            Info("Using fallback album_artist for $_[0]\n");
             $artist = $temp;
         }
     }
@@ -44,17 +44,17 @@ sub GenTrackTextBlock { # song URI, index
     if (!defined $title) {
         my $add_metadata = YesNo("The track $_[0] does not have title metadata. Do you want to add a title?");
         if ($add_metadata) {
-            info("Set title for $_[0]:");
+            Info("Set title for $_[0]:");
             $title = <>;
         } else {
             $title = "";
         }
     }
     if ($title =~ /[^\x00-\x7F]/) {
-        warn("The track \033[1m$_[0]\033[0m contains characters that may not render properly on some CD players.\n")
+        Warn("The track \033[1m$_[0]\033[0m contains characters that may not render properly on some CD players.\n")
     }
     if (length($title) >=21) {
-        warn("The track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
+        Warn("The track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
     }
 
     #Ensure artist meta is valid
@@ -68,10 +68,10 @@ sub GenTrackTextBlock { # song URI, index
         }
     }
     if ($artist =~ /[^\x00-\x7F]/) {
-        warn("The artist of track $_[0] contains characters that may not render properly on some CD players.\n")
+        Warn("The artist of track $_[0] contains characters that may not render properly on some CD players.\n")
     }
     if (length($artist) >=21) {
-        warn("The artist track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
+        Warn("The artist track $_[0] has title metadata that is longer than 21 characters, it may not be fully visible on some CD players.\n")
     }
     
     #Remove whitespace and generate the block
@@ -112,7 +112,7 @@ sub DetermineMpdMusicDirectory {
 
 sub DeterminePlaylistLength {
     my $total_seconds = 0;
-    my @lengths = split("\n", `mpc playlist -f '\%time\%' $_[0]`);
+    my @lengths = split("\n", `mpc playlist -f '\%time\%' '$_[0]'`);
     foreach my $length (@lengths) {
         my @split = split(":", $length);
         $total_seconds += $split[1];
@@ -139,20 +139,42 @@ printf("Choose a playlist to convert:");
 my $selection = <>;
 chomp($selection);
 while ($selection < 0 || $selection >= (scalar @playlists)) {
-    error("Invalid index");
-    printf("Choose a playlist to convert:")
+    Error("Invalid index");
+    printf("Choose a playlist to convert:");
     $selection = <>;
 }
 
+#print out playlist quality options
+
 my $playlist_length_seconds = DeterminePlaylistLength($playlists[$selection]);
-if ($playlist_length_seconds > 80*60) { #80 minutes
-    my $warn_selection = YesNo("This playlist exceeds 80 minutes. Are you sure you want to continue?");
-    if (!$warn_selection) {
-        exit;
+Info("Playlist length is ".$playlist_length_seconds." seconds");
+my $cd_format_choice = "";
+my @mp3_formats = (64,96,128,196,256);
+for (my $i = 0; $i < scalar @mp3_formats; $i++) {
+    my $bitrate = $mp3_formats[$i];
+    my $total_size = $playlist_length_seconds * (($bitrate)/(8*1024)); # total size in megabytes
+    my $color = "\033[1m";
+    my $extra = "";
+    if ($total_size > 650) {
+        $color = "\033[90;1m";
+        $extra = "(unavailable)";
     }
+    printf("%s%d - MP3 [%dkbps] (~%.1f MB) %s\033[0m\n", $color, $i+1, $bitrate, $total_size, $extra);
+}
+if ($playlist_length_seconds > 80*60) { #80 minutes
+    printf("\033[90;1m%d - WAV (unavailable)\033[0m\n", scalar @mp3_formats+1);
+} else {
+    printf("\033[1m%d - WAV\033[0m\n", scalar @mp3_formats+1);
 }
 
-my @songs = split("\n", `mpc playlist -f '\%file\%' $playlists[$selection]`);
+my $format_selection = -1;
+while ($format_selection <= 0 || $format_selection > scalar @mp3_formats+1) {
+    printf("Please select an option:");
+    $format_selection = <>;
+}
+$format_selection--; #move it into valid range
+
+my @songs = split("\n", `mpc playlist -f '\%file\%' '$playlists[$selection]'`);
 
 my $tmp_dir =  tempdir(CLEANUP => 1);
 my @cdtext_info = ();
